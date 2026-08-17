@@ -1,0 +1,224 @@
+{
+  "paramsUsed": {
+    "python_exe": "/Users/masatosadahiro/Code/matlab_scripts/Voltage-Imaging-Analysis-ML/auto_roi/.venv_cellpose/bin/python",
+    "wrapper_path": "/Users/masatosadahiro/Code/matlab_scripts/Voltage-Imaging-Analysis-ML/auto_roi/cellpose_wrapper.py",
+    "model": "cpsam",
+    "diameter": 30.0,
+    "flow_threshold": 0.4,
+    "cellprob_threshold": 0.0,
+    "use_gpu": false,
+    "min_area_px": 150,
+    "max_area_px": 5000,
+    "min_separation_px": 15.0,
+    "max_cells": null,
+    "exclude_border_px": 0,
+    "dilate_radius_px": 3
+  },
+  "nRaw": 20,
+  "nAccepted": 17,
+  "acceptedLabelsInOrder": [
+    3,
+    2,
+    1,
+    5,
+    4,
+    6,
+    7,
+    8,
+    9,
+    11,
+    14,
+    13,
+    15,
+    16,
+    18,
+    19,
+    20
+  ],
+  "labels": [
+    {
+      "label": 1,
+      "areaPx": 404,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 8.180693069306932,
+      "centroidCol": 185.14356435643563,
+      "meanIntensity": 210.24849025772806
+    },
+    {
+      "label": 2,
+      "areaPx": 382,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 7.392670157068062,
+      "centroidCol": 255.6020942408377,
+      "meanIntensity": 257.81630414064784
+    },
+    {
+      "label": 3,
+      "areaPx": 172,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 6.813953488372093,
+      "centroidCol": 386.3779069767442,
+      "meanIntensity": 179.05837180763754
+    },
+    {
+      "label": 4,
+      "areaPx": 402,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 13.41044776119403,
+      "centroidCol": 125.41791044776119,
+      "meanIntensity": 227.62280937580235
+    },
+    {
+      "label": 5,
+      "areaPx": 423,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 13.328605200945626,
+      "centroidCol": 33.6548463356974,
+      "meanIntensity": 172.2372236664795
+    },
+    {
+      "label": 6,
+      "areaPx": 447,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 13.557046979865772,
+      "centroidCol": 212.248322147651,
+      "meanIntensity": 295.17495660237324
+    },
+    {
+      "label": 7,
+      "areaPx": 176,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 14.227272727272727,
+      "centroidCol": 153.54545454545453,
+      "meanIntensity": 167.74906468221357
+    },
+    {
+      "label": 8,
+      "areaPx": 263,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 16.79467680608365,
+      "centroidCol": 293.9239543726236,
+      "meanIntensity": 175.2997608634009
+    },
+    {
+      "label": 9,
+      "areaPx": 455,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 23.246153846153845,
+      "centroidCol": 251.55384615384617,
+      "meanIntensity": 311.5221687928278
+    },
+    {
+      "label": 10,
+      "areaPx": 67,
+      "accepted": false,
+      "rejectReason": "area 67 < minAreaPx 150",
+      "centroidRow": 17.19402985074627,
+      "centroidCol": 345.2835820895522,
+      "meanIntensity": 168.1519129103826
+    },
+    {
+      "label": 11,
+      "areaPx": 426,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 26.023474178403756,
+      "centroidCol": 275.2863849765258,
+      "meanIntensity": 258.8260241212497
+    },
+    {
+      "label": 12,
+      "areaPx": 122,
+      "accepted": false,
+      "rejectReason": "area 122 < minAreaPx 150",
+      "centroidRow": 29.852459016393443,
+      "centroidCol": 320.5409836065574,
+      "meanIntensity": 162.45626839136264
+    },
+    {
+      "label": 13,
+      "areaPx": 619,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 41.44749596122779,
+      "centroidCol": 107.97253634894992,
+      "meanIntensity": 223.26084234656494
+    },
+    {
+      "label": 14,
+      "areaPx": 438,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 40.529680365296805,
+      "centroidCol": 219.05251141552512,
+      "meanIntensity": 231.74660876912907
+    },
+    {
+      "label": 15,
+      "areaPx": 385,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 42.23116883116883,
+      "centroidCol": 193.65454545454546,
+      "meanIntensity": 259.85508084972275
+    },
+    {
+      "label": 16,
+      "areaPx": 462,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 44.03030303030303,
+      "centroidCol": 262.05627705627705,
+      "meanIntensity": 302.96428911326615
+    },
+    {
+      "label": 17,
+      "areaPx": 122,
+      "accepted": false,
+      "rejectReason": "area 122 < minAreaPx 150",
+      "centroidRow": 48.057377049180324,
+      "centroidCol": 296.3360655737705,
+      "meanIntensity": 224.9539664917185
+    },
+    {
+      "label": 18,
+      "areaPx": 387,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 54.23514211886305,
+      "centroidCol": 281.41602067183464,
+      "meanIntensity": 245.75135077439913
+    },
+    {
+      "label": 19,
+      "areaPx": 225,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 56.266666666666666,
+      "centroidCol": 395.0622222222222,
+      "meanIntensity": 153.340669056793
+    },
+    {
+      "label": 20,
+      "areaPx": 334,
+      "accepted": true,
+      "rejectReason": "",
+      "centroidRow": 57.10179640718563,
+      "centroidCol": 154.67664670658684,
+      "meanIntensity": 297.6899597051296
+    }
+  ],
+  "cellposeElapsedSec": 28.68,
+  "totalElapsedSec": 28.7,
+  "autoRoiDir": "/Users/masatosadahiro/Code/python_scripts/Voltage-Imaging-Analysis-Py/VoltImg_mapping_analysis_Py/validation_out/AutoROI",
+  "cellposeVersion": "4.2.1.1"
+}

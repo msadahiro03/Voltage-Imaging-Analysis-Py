@@ -100,7 +100,11 @@ def write_stack_uint16_rescaled(path, stack_hwt):
     mc_min = x.min()
     mc_max = x.max()
     if mc_max > mc_min:
-        out = np.uint16((x - mc_min) / (mc_max - mc_min) * 65535.0)
+        # MATLAB's uint16() cast ROUNDS (half away from zero); np.uint16()
+        # truncates toward zero, which put every saved pixel off by up to one
+        # count. Values here are non-negative, so floor(x + 0.5) is exact
+        # MATLAB rounding (np.rint would round half-to-even).
+        out = np.floor((x - mc_min) / (mc_max - mc_min) * 65535.0 + 0.5).astype(np.uint16)
     else:
         out = np.zeros_like(x, dtype=np.uint16)
     # (H, W, T) -> (T, H, W) pages.

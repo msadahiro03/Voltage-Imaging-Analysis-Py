@@ -21,6 +21,7 @@ from .matlab_compat import (
     butter_lowpass,
     colon_count,
     matlab_filtfilt,
+    matlab_round,
     std_n1_omitnan,
     tinv,
 )
@@ -95,10 +96,10 @@ def sort_holograms(
 
     # Prestim baseline index setup (MATLAB 264-274) -- computed but mostly used
     # for reporting; the per-holo detrend uses its own local indices.
-    n_first_pulse_sample = int(round(n_pulse_coords[0]))
+    n_first_pulse_sample = matlab_round(n_pulse_coords[0])
     i_last_pre_stim = max(1, n_first_pulse_sample - 1)
     pre_stim_baseline_trim_ms = 2
-    edge_samp = int(round(pre_stim_baseline_trim_ms / 1000 * fs))
+    edge_samp = matlab_round(pre_stim_baseline_trim_ms / 1000 * fs)
     idx1 = min(i_last_pre_stim, 1 + edge_samp)
     idx2 = max(idx1, i_last_pre_stim - edge_samp)
     if idx2 < idx1:
@@ -154,7 +155,7 @@ def sort_holograms(
                    for cc in range(n_conds)]        # [cc][hh] -> list of columns
     cond_sorted_inputs = [[] for _ in range(n_conds)]
 
-    n_pre_samp = max(1, int(round(pre_stim_window / 1000 * fs)) - 1)
+    n_pre_samp = max(1, matlab_round(pre_stim_window / 1000 * fs) - 1)
 
     for tt in range(1, n_trials + 1):
         cc = int(trial_cond[tt - 1])

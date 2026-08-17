@@ -16,6 +16,7 @@ gotcha #2). Image arrays are indexed ``img[row, col]`` (row-major NumPy).
 from __future__ import annotations
 
 import math
+import warnings
 from typing import Tuple
 
 import numpy as np
@@ -33,10 +34,30 @@ def colon_count(x: float) -> int:
 
     MATLAB ``1:x`` yields ``[1, 2, ..., floor(x)]`` when ``x >= 1``; ``floor(x)``
     elements. For ``x < 1`` it is empty (0 elements). Gotcha #1.
+
+    MATLAB's colon operator additionally snaps a limit that is within a few
+    ulps of an integer onto that integer, so ``1:0.29*10000`` has 2900 elements
+    even though ``0.29*10000 == 2899.9999999999995`` (verified in R2025b). A
+    plain ``floor`` would give 2899 and shift every downstream window index.
     """
+    x = float(x)
+    nearest = round(x)
+    if abs(x - nearest) <= 4.0 * np.spacing(max(1.0, abs(x))):
+        x = float(nearest)
     if x < 1:
         return 0
     return int(math.floor(x))
+
+
+def matlab_round(x: float) -> int:
+    """MATLAB ``round``: half away from zero (Python/NumPy round is half-to-even).
+
+    ``round(50.5)`` is 51 in MATLAB but 50 for Python's builtin. Window-length
+    computations (``round(ms/1000*freq)``) land exactly on ``.5`` for real
+    sampling rates, so banker's rounding changes window sizes by one sample.
+    """
+    x = float(x)
+    return int(math.floor(x + 0.5)) if x >= 0 else int(math.ceil(x - 0.5))
 
 
 def matlab_1based_slice(n_from: int, n_to: int) -> slice:
@@ -94,16 +115,35 @@ def mad1(x: np.ndarray) -> float:
 
 
 def std_n1(x: np.ndarray, axis=None) -> np.ndarray:
-    """MATLAB ``std(x)`` default: sample std, N-1 normalization (ddof=1)."""
+    """MATLAB ``std(x)`` default: sample std, N-1 normalization (ddof=1).
+
+    MATLAB quirk (documented in ``var.m``): with a single observation the
+    denominator N is used instead of N-1, so ``std(5)`` is 0, not NaN.
+    ``np.std(..., ddof=1)`` on one sample gives NaN.
+    """
+    x = np.asarray(x, dtype=float)
+    n = x.size if axis is None else x.shape[axis]
+    if n == 1:
+        # N normalization: 0 for a finite sample, NaN propagates naturally.
+        return np.std(x, axis=axis, ddof=0)
     return np.std(x, axis=axis, ddof=1)
 
 
 def std_n1_omitnan(x: np.ndarray, axis=None) -> np.ndarray:
     """MATLAB ``std(x, 0, axis, 'omitnan')``: N-1, NaN-aware.
 
-    N-1 uses the per-column count of *finite* samples, matching MATLAB.
+    N-1 uses the per-column count of *finite* samples, matching MATLAB --
+    except that a slice with exactly ONE non-NaN sample yields 0 in MATLAB
+    (single-observation N normalization, ``std([NaN; 4], 0, 1, 'omitnan')``
+    is 0, verified in R2025b) where ``np.nanstd(..., ddof=1)`` yields NaN.
+    A slice with zero non-NaN samples stays NaN in both.
     """
-    return np.nanstd(x, axis=axis, ddof=1)
+    x = np.asarray(x, dtype=float)
+    n_finite = np.sum(~np.isnan(x), axis=axis)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        out = np.nanstd(x, axis=axis, ddof=1)
+    return np.where(n_finite == 1, 0.0, out)
 
 
 def var_n(x: np.ndarray) -> float:
@@ -138,15 +178,20 @@ def im2double(img: np.ndarray) -> np.ndarray:
     return img.astype(np.float64)
 
 
-def imgaussfilt(img: np.ndarray, sigma: float) -> np.ndarray:
-    """MATLAB ``imgaussfilt(img, sigma)``.
+def imgaussfilt(img: np.ndarray, sigma: float, filter_size: int | None = None) -> np.ndarray:
+    """MATLAB ``imgaussfilt(img, sigma[, 'FilterSize', k])``.
 
     MATLAB's default filter size is ``2*ceil(2*sigma)+1`` with 'replicate'
     padding. scipy ``gaussian_filter`` truncates by radius; we set ``truncate``
-    so the kernel half-width == ceil(2*sigma), i.e. radius = ceil(2*sigma),
-    and use mode='nearest' to mirror 'replicate'.
+    so the kernel half-width matches (radius = (filter_size-1)/2), and use
+    mode='nearest' to mirror 'replicate'. ``filter_size`` must be odd when
+    given (MATLAB requires odd FilterSize); fibermetric passes
+    ``2*ceil(3*sigma)+1``.
     """
-    radius = int(math.ceil(2 * sigma))
+    if filter_size is None:
+        radius = int(math.ceil(2 * sigma))
+    else:
+        radius = (int(filter_size) - 1) // 2
     truncate = radius / sigma if sigma > 0 else 0.0
     return ndi.gaussian_filter(
         img, sigma=sigma, mode="nearest", truncate=truncate
@@ -168,11 +213,16 @@ def butter_default(order: int, cutoff_hz: float, fs: float):
 def matlab_filtfilt(b, a, x):
     """MATLAB ``filtfilt`` (zero-phase). Ephys path only (gotcha #4).
 
-    scipy ``filtfilt`` default padding (odd, padlen=3*max(len(a),len(b))) matches
-    MATLAB's default well for these signal lengths.
+    scipy's odd-reflection extension and steady-state initial conditions match
+    MATLAB's (verified against filtfilt.m), but the DEFAULT pad length does
+    not: MATLAB pads ``3*(max(len(a),len(b)) - 1)`` samples per end
+    (``l = max(1, 3*filtord(b,a))``, filtfilt.m:211) while scipy defaults to
+    ``3*max(len(a),len(b))``. For the 4th-order Butterworth used here that is
+    12 vs 15, which changes edge transients. Pass MATLAB's padlen explicitly.
     """
     x = np.asarray(x, dtype=float).ravel()
-    return filtfilt(b, a, x)
+    padlen = 3 * (max(len(a), len(b)) - 1)
+    return filtfilt(b, a, x, padlen=padlen)
 
 
 def matlab_filter(b, a, x):
@@ -192,54 +242,50 @@ def matlab_filter(b, a, x):
 def strel_disk(radius: int) -> np.ndarray:
     """Replicate MATLAB ``strel('disk', r)`` structuring element (n=4 default).
 
-    For the small radii used here (2, 5) MATLAB decomposes the disk into a
-    sum of line strels, producing an *approximated* (not Euclidean) disk. To
-    stay faithful we reconstruct MATLAB's actual disk masks for the radii the
-    pipeline uses; for other radii we fall back to a Euclidean disk and warn via
-    the shape. See notes in README about disk-shape fidelity risk.
-
-    MATLAB reference masks (r, with default n=4):
-      r=2 -> 5x5:            r=3 -> 7x7:            r=5 -> 11x11
+    Masks below are verbatim ``getnhood(strel('disk', r))`` output from MATLAB
+    R2025b. Two non-obvious facts about MATLAB's disk (see strel.m,
+    MakeDiskStrel): for r < 3 the decomposition is bypassed and the strel is a
+    plain Euclidean disk (r=2 is the 13-px diamond, NOT an octagon); for
+    r >= 3 the periodic-line decomposition yields a mask that is SMALLER than
+    a Euclidean disk (axial half-extent r-1, e.g. r=5 is 9x9 with 69 px). A
+    Euclidean fallback is therefore wrong for every r >= 3, so unverified
+    large radii raise instead of silently diverging -- add the MATLAB mask if
+    the pipeline ever uses a new radius.
     """
-    # Hard-coded MATLAB strel('disk', r) neighborhoods (default N=4 decomposition)
-    # obtained from MATLAB `getnhood(strel('disk', r))`.
     presets = {
         2: np.array([
+            [0, 0, 1, 0, 0],
             [0, 1, 1, 1, 0],
             [1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1],
             [0, 1, 1, 1, 0],
+            [0, 0, 1, 0, 0],
         ], dtype=bool),
-        3: np.array([
-            [0, 0, 1, 1, 1, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0],
-            [1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1],
-            [0, 1, 1, 1, 1, 1, 0],
-            [0, 0, 1, 1, 1, 0, 0],
-        ], dtype=bool),
+        3: np.ones((5, 5), dtype=bool),
         5: np.array([
-            [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-            [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0],
+            [0, 0, 1, 1, 1, 1, 1, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 1, 0],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 1, 1, 1, 1, 1, 0, 0],
         ], dtype=bool),
     }
     if radius in presets:
         return presets[radius]
-    # Fallback: Euclidean disk.
-    L = np.arange(-radius, radius + 1)
-    xx, yy = np.meshgrid(L, L)
-    return (xx ** 2 + yy ** 2) <= radius ** 2
+    if radius < 3:
+        # MATLAB forces n=0 (no decomposition) for r < 3: exact Euclidean disk.
+        L = np.arange(-radius, radius + 1)
+        xx, yy = np.meshgrid(L, L)
+        return (xx ** 2 + yy ** 2) <= radius ** 2
+    raise ValueError(
+        f"strel_disk({radius}): no verified MATLAB mask for r >= 3 beyond the "
+        "presets. MATLAB's decomposed disk is smaller than a Euclidean disk, "
+        "so a fallback would silently break parity. Print "
+        f"getnhood(strel('disk',{radius})) in MATLAB and add it to the presets."
+    )
 
 
 def imdilate_disk(mask: np.ndarray, radius: int) -> np.ndarray:

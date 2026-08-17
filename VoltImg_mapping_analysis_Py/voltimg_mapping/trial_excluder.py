@@ -1,9 +1,10 @@
 """Trial excluder (Stage H).
 
 The external ``VoltImg_mapping_analysis_MultiCell_trialExcluder.m`` invoked at
-line 1335 of the main script is absent locally. Per the porting spec its logic
-is the multi-cell version inlined in
-``globalPerTrialF0_...laserRowArtifact.m`` lines 372-512, which is AUTHORITATIVE.
+line 1335 of the main script lives at
+``archive_MultiCell/VoltImg_mapping_analysis_MultiCell_trialExcluder.m`` in the
+MATLAB repo; its logic is identical to the multi-cell version inlined in
+``globalPerTrialF0_...laserRowArtifact.m`` lines 372-512.
 That version uses:
   * amplitude reject:  any sample < -2.5 * std(allTrials(:))   -> NaN the column
   * late-peak reject:  argmax(excl column) index (1-based) > 45 -> NaN the column
@@ -36,9 +37,24 @@ def _std_over_all(mat: np.ndarray) -> float:
     We reproduce MATLAB EXACTLY: no omitnan here.
     """
     flat = np.asarray(mat, dtype=float).ravel()
-    if flat.size < 2:
-        return np.nan
+    if flat.size == 0:
+        return np.nan  # MATLAB std([]) is NaN
+    if flat.size == 1:
+        # MATLAB single-observation rule: denominator N, so std(scalar) is 0
+        # for a finite value (NaN input still propagates NaN).
+        return float(np.std(flat, ddof=0))
     return float(np.std(flat, ddof=1))  # NaN-propagating, like MATLAB std(X(:))
+
+
+def _matlab_max_index_1based(col: np.ndarray) -> int:
+    """MATLAB ``[~, i] = max(x)``: NaN is ignored; all-NaN returns index 1.
+
+    ``np.argmax`` instead returns the index of the FIRST NaN, which would
+    spuriously trip the late-peak test on a partially-NaN column.
+    """
+    if np.all(np.isnan(col)):
+        return 1
+    return int(np.nanargmax(col)) + 1
 
 
 def _ci_columns(mat, up_or_down, confidence_level=0.95):
@@ -124,9 +140,9 @@ def run_trial_excluder(holo_all, filt_holo_all, n_holos, up_or_down,
             for tt in range(n_tr):
                 if np.any(np.isnan(fexcl[:, tt])):
                     continue
-                # MATLAB max returns first max index; np.argmax matches (first).
-                max_imaging_index = int(np.argmax(excl[:, tt])) + 1  # 1-based
-                max_filt_index = int(np.argmax(fexcl[:, tt])) + 1
+                # MATLAB max returns the first max index and ignores NaN.
+                max_imaging_index = _matlab_max_index_1based(excl[:, tt])
+                max_filt_index = _matlab_max_index_1based(fexcl[:, tt])
                 if max_imaging_index > late_peak_thresh:
                     excl[:, tt] = np.nan
                 if max_filt_index > late_peak_thresh:

@@ -1,0 +1,2 @@
+matplotlib not installed in this environment; overlay skipped.
+The MATLAB-side QC overlay or the report JSON carry the same information.

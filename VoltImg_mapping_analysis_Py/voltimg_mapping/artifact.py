@@ -136,6 +136,11 @@ def apply_laser_row_artifact_to_stack(
             if np.isnan(mv) or np.isinf(mv):
                 mv = 0
             fr_out = fr.copy()
+            if np.issubdtype(fr_out.dtype, np.integer):
+                # MATLAB median() on an integer frame returns the integer
+                # class, rounding half away from zero (median 100.5 -> 101);
+                # a bare astype() would truncate to 100.
+                mv = np.floor(mv + 0.5) if mv >= 0 else np.ceil(mv - 0.5)
             mv = np.array(mv).astype(fr_out.dtype)
             fr_out[bad_rows, :] = mv
         elif mc_mode == "nan":

@@ -1,0 +1,177 @@
+{
+  "status": "ok",
+  "nMasks": 20,
+  "cellposeVersion": "4.2.1.1",
+  "model": "cpsam",
+  "diameterUsed": 30.0,
+  "flowThreshold": 0.4,
+  "cellprobThreshold": 0.0,
+  "useGpu": false,
+  "imageShape": [
+    64,
+    512
+  ],
+  "elapsedSec": 26.06,
+  "masks": [
+    {
+      "label": 1,
+      "areaPx": 404,
+      "centroidRowCol0": [
+        8.180693069306932,
+        185.14356435643563
+      ]
+    },
+    {
+      "label": 2,
+      "areaPx": 382,
+      "centroidRowCol0": [
+        7.392670157068062,
+        255.6020942408377
+      ]
+    },
+    {
+      "label": 3,
+      "areaPx": 172,
+      "centroidRowCol0": [
+        6.813953488372093,
+        386.3779069767442
+      ]
+    },
+    {
+      "label": 4,
+      "areaPx": 402,
+      "centroidRowCol0": [
+        13.41044776119403,
+        125.41791044776119
+      ]
+    },
+    {
+      "label": 5,
+      "areaPx": 423,
+      "centroidRowCol0": [
+        13.328605200945626,
+        33.6548463356974
+      ]
+    },
+    {
+      "label": 6,
+      "areaPx": 447,
+      "centroidRowCol0": [
+        13.557046979865772,
+        212.248322147651
+      ]
+    },
+    {
+      "label": 7,
+      "areaPx": 176,
+      "centroidRowCol0": [
+        14.227272727272727,
+        153.54545454545453
+      ]
+    },
+    {
+      "label": 8,
+      "areaPx": 263,
+      "centroidRowCol0": [
+        16.79467680608365,
+        293.9239543726236
+      ]
+    },
+    {
+      "label": 9,
+      "areaPx": 455,
+      "centroidRowCol0": [
+        23.246153846153845,
+        251.55384615384617
+      ]
+    },
+    {
+      "label": 10,
+      "areaPx": 67,
+      "centroidRowCol0": [
+        17.19402985074627,
+        345.2835820895522
+      ]
+    },
+    {
+      "label": 11,
+      "areaPx": 426,
+      "centroidRowCol0": [
+        26.023474178403756,
+        275.2863849765258
+      ]
+    },
+    {
+      "label": 12,
+      "areaPx": 122,
+      "centroidRowCol0": [
+        29.852459016393443,
+        320.5409836065574
+      ]
+    },
+    {
+      "label": 13,
+      "areaPx": 619,
+      "centroidRowCol0": [
+        41.44749596122779,
+        107.97253634894992
+      ]
+    },
+    {
+      "label": 14,
+      "areaPx": 438,
+      "centroidRowCol0": [
+        40.529680365296805,
+        219.05251141552512
+      ]
+    },
+    {
+      "label": 15,
+      "areaPx": 385,
+      "centroidRowCol0": [
+        42.23116883116883,
+        193.65454545454546
+      ]
+    },
+    {
+      "label": 16,
+      "areaPx": 462,
+      "centroidRowCol0": [
+        44.03030303030303,
+        262.05627705627705
+      ]
+    },
+    {
+      "label": 17,
+      "areaPx": 122,
+      "centroidRowCol0": [
+        48.057377049180324,
+        296.3360655737705
+      ]
+    },
+    {
+      "label": 18,
+      "areaPx": 387,
+      "centroidRowCol0": [
+        54.23514211886305,
+        281.41602067183464
+      ]
+    },
+    {
+      "label": 19,
+      "areaPx": 225,
+      "centroidRowCol0": [
+        56.266666666666666,
+        395.0622222222222
+      ]
+    },
+    {
+      "label": 20,
+      "areaPx": 334,
+      "centroidRowCol0": [
+        57.10179640718563,
+        154.67664670658684
+      ]
+    }
+  ]
+}

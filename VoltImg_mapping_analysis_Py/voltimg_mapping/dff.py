@@ -29,6 +29,7 @@ from .matlab_compat import (
     butter_default,
     colon_count,
     matlab_filter,
+    matlab_round,
     std_n1_omitnan,
     tinv,
 )
@@ -180,7 +181,7 @@ def compute_trial_dff_common_f0(
         pre_end = max(pre_end, 1)
         pre_trace = roi_mean_f_corrected[:pre_end]
         lpre = pre_trace.size
-        win_frames = max(2, int(round(f0_win_ms / 1000 * imaging_freq)))
+        win_frames = max(2, matlab_round(f0_win_ms / 1000 * imaging_freq))
         w = min(win_frames, lpre)
         if lpre >= 2 and w >= 2 and lpre >= w:
             n_win = lpre - w + 1
@@ -188,7 +189,13 @@ def compute_trial_dff_common_f0(
                 np.var(pre_trace[sw : sw + w], ddof=0)  # var(x,1) -> N norm
                 for sw in range(n_win)
             ])
-            iw = int(np.argmin(win_vars))  # 0-based
+            # MATLAB min ignores NaN (all-NaN -> index 1); np.argmin would
+            # pick the first NaN window (reachable when the corrected trace
+            # has NaN frames under laserArtifactMcSecondSweepForDff).
+            if np.all(np.isnan(win_vars)):
+                iw = 0
+            else:
+                iw = int(np.nanargmin(win_vars))  # 0-based
             f0_trial = float(np.mean(pre_trace[iw : iw + w]))
             pre_filt = roi_mean_f_corrected_filt[:pre_end]
             f0_filt_trial = float(np.mean(pre_filt[iw : iw + w]))

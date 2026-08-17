@@ -1,0 +1,11 @@
+/Users/masatosadahiro/Code/matlab_scripts/Voltage-Imaging-Analysis-ML/auto_roi/.venv_cellpose/bin/python /Users/masatosadahiro/Code/matlab_scripts/Voltage-Imaging-Analysis-ML/auto_roi/cellpose_wrapper.py --image /Users/masatosadahiro/Code/python_scripts/Voltage-Imaging-Analysis-Py/VoltImg_mapping_analysis_Py/validation_out/AutoROI/input_mean_image.tif --params /Users/masatosadahiro/Code/python_scripts/Voltage-Imaging-Analysis-Py/VoltImg_mapping_analysis_Py/validation_out/AutoROI/params.json --outdir /Users/masatosadahiro/Code/python_scripts/Voltage-Imaging-Analysis-Py/VoltImg_mapping_analysis_Py/validation_out/AutoROI
+
+exit status: 0
+elapsed: 28.7 s
+
+--- stdout ---
+cellpose_wrapper: 20 masks in 26.1s (model=cpsam, cellpose=4.2.1.1)
+
+--- stderr ---
+/Users/masatosadahiro/Code/matlab_scripts/Voltage-Imaging-Analysis-ML/auto_roi/.venv_cellpose/lib/python3.11/site-packages/cellpose/dynamics.py:541: UserWarning: Sparse invariant checks are implicitly disabled. Memory errors (e.g. SEGFAULT) will occur when operating on a sparse tensor which violates the invariants, but checks incur performance overhead. To silence this warning, explicitly opt in or out. See `torch.sparse.check_sparse_tensor_invariants.__doc__` for guidance.  (Triggered internally at /Users/runner/work/pytorch/pytorch/aten/src/ATen/Context.cpp:823.)
+  coo = torch.sparse_coo_tensor(pt, torch.ones(pt.shape[1], device=pt.device, dtype=torch.int),

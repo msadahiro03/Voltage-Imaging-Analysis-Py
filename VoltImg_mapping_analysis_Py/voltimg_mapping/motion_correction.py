@@ -18,8 +18,8 @@ The MATLAB NoRMCorre parameters (for whoever runs strategy 2 or the MATLAB step)
     NoRMCorreSetParms('d1',H,'d2',W,'bin_width',15,'max_shift',4,'us_fac',50,
                       'init_batch',1)  -- rigid, single global template.
 
-`normcorre_fn` in run_motion_correction lets you inject either a CaImAn-backed
-callable or a stub; if None, the function raises to force an explicit choice.
+This module only ports the Pass-1 template accumulation
+(`build_global_template`); the MC step itself is external (strategy 1 or 2).
 """
 
 from __future__ import annotations

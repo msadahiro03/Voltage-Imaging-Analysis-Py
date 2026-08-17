@@ -24,7 +24,7 @@ pip install numpy scipy tifffile
 | B: ephys baseline + trial exclusion | 213-236 | `ephys.baseline_and_exclude` |
 | C: ephys hologram sorting | 238-431 | `ephys.sort_holograms`, `ephys.ephys_confidence_intervals` |
 | D: motion correction + maxDvStack | 433-694 | `motion_correction.build_global_template`, `pipeline.build_maxdv_stack`, `sampling.max_dv_stack_sampling_plan` |
-| E: rough ROIs + global fine ROIs | 732-910 | `pipeline.compute_global_rois`, `roi.compute_global_fine_roi` |
+| E: rough ROIs + global fine ROIs | 732-910 | `auto_roi.detect_rough_rois_cellpose` (automatic) or external masks; `pipeline.compute_global_rois`, `roi.compute_global_fine_roi` |
 | F: dF/F with per-trial fine ROIs | 912-1262 | `pipeline.run_dff`, `roi.compute_trial_fine_roi`, `roi.compute_trial_neuropil_ring`, `fextract`, `dff.compute_trial_dff` |
 | G: per-holo means + CIs | 1264-1323 | `dff.holo_means_and_ci` |
 | H: trial excluder | 1335 (external) | `trial_excluder.run_trial_excluder` |
@@ -44,10 +44,40 @@ whole-image `im2double`), and the commented-out plotting/QC blocks
 3. **Motion correction** — see "External libraries" below. Produce
    `Motion_Corrected_Tiffs/<rawName>_mc.tif` per trial.
 4. `pipeline.build_maxdv_stack(...)` over the MC stacks -> `meanFluorMaxDvStack`.
-5. Draw rough ROIs on `meanFluorMaxDvStack` (interactive in MATLAB; supply as
-   0-based `(rows, cols)` arrays here). Then `pipeline.compute_global_rois(...)`.
+5. Rough ROIs on `meanFluorMaxDvStack` — two options:
+   - **Automatic (2026-08)**: `auto_roi.detect_rough_rois_cellpose(mean_img)` —
+     Cellpose segmentation, bit-identical to the MATLAB
+     `auto_roi/voltimg_autoRoi_cellpose.m` path (shared wrapper + venv, see
+     "Automatic rough ROIs" below).
+   - Manual: draw in MATLAB and supply as 0-based `(rows, cols)` arrays.
+   Then `pipeline.compute_global_rois(...)`.
 6. `pipeline.run_dff(mc_stack_loader=..., rough_rois=..., bkgrnd_global=...)`.
 7. `trial_excluder.run_trial_excluder(...)` per cell.
+
+## Automatic rough ROIs (Cellpose, added 2026-08)
+
+`voltimg_mapping/auto_roi.py` ports the MATLAB auto-ROI orchestrator
+(`Voltage-Imaging-Analysis-ML/auto_roi/voltimg_autoRoi_cellpose.m`). Both call
+the SAME `cellpose_wrapper.py` in the SAME `.venv_cellpose` (python 3.11 +
+cellpose 4 `cpsam`; built by `auto_roi/setup_cellpose_env.sh` in the MATLAB
+repo) via subprocess — this port's own 3.14 interpreter cannot host torch.
+Pipeline: sanitize -> uint16 exchange TIFF (MATLAB-identical rounding) ->
+Cellpose -> quality filters (border/area/greedy-separation/maxCells) ->
+centroid (row, col) ordering -> `imdilate_disk` (strel-exact; default 3 px,
+tuned to hand-drawn margins) -> `matlab_find_2d` -> 0-based `(rows, cols)`.
+
+Cross-language parity verified 2026-08-14 on the sample FOV: exchange TIFF,
+label masks, accepted set/order, and final rough pixel lists (including
+column-major order) all identical between MATLAB and Python; 17/20 masks
+accepted, all 8 hand-drawn ground-truth cells recovered.
+
+Live runner: `--roi-format cellpose --rois <mean_image.tif|.npy>`
+(+ optional `--cellpose-cfg overrides.json`); rough ROIs are detected up front
+and the global neuropil rings are bootstrapped from the same mean image via
+`compute_global_rois` with a 1-slice stack. Detection artifacts (exchange
+files, `autoRoi_report.json`, QC overlay if matplotlib is installed, log) land
+in `<out>/AutoROI/`. Zero surviving cells raises `auto_roi.AutoRoiError` with
+per-label reject reasons.
 
 ## Coordinate & indexing conventions (the load-bearing ones)
 
@@ -101,23 +131,66 @@ No faithful NumPy equivalent. Two options:
    algorithm but will not be bit-identical (different FFT/subpixel code). Inject
    it and validate against MATLAB.
 
-### fibermetric (Frangi ridge filter) — highest fidelity risk (gotcha #7)
-`fibermetric.py` implements a Frangi-1998 2-D vesselness with MATLAB's exposed
-knobs (`StructureSensitivity`, default `BlobnessSensitivity=0.5`, bright
-polarity, default thickness range 4:2:14). MathWorks does not document the exact
-kernel scales/normalization, so **response values are not bit-identical**.
-Downstream, the response is only used through relative percentile thresholds
-(`prctile(nonzeros, 50)` global, `prctile(nonzeros, 60)` per-trial) then
-binarized, so ROI masks are robust to monotone rescaling — but ridge *geometry*
-can still differ. **Validate ROI masks against MATLAB on sample images before
-trusting dF/F numbers.**
+### fibermetric (Frangi ridge filter) — now EXACT (gotcha #7, resolved 2026-08)
+`fibermetric.py` reproduces MATLAB `fibermetric` exactly (max abs diff ~1e-16
+vs R2025b on ridge/random test images, borders included, bright and dark
+polarity, single- and multi-scale). Verified structure: `sigma = thickness/6`,
+pre-smooth `imgaussfilt(V, sigma, 'FilterSize', 2*ceil(3*sigma)+1)` (from
+fibermetric.m source); the C++ builtin's Hessian was identified empirically as
+the 5-tap stencil `[1 0 -2 0 1]/4` (cross term `[1 0 -1]/2` per axis) with
+half-sample symmetric borders, sigma^2 scale normalization, Frangi beta=0.5
+(MATLAB exposes no blobness knob). Earlier ports used sigma=thickness/(2*sqrt(3))
+and a global-max rescale — both wrong.
 
-### strel('disk', r) shape (gotcha #10)
-`matlab_compat.strel_disk` hard-codes MATLAB's actual `strel('disk', r)`
-neighborhoods for the radii the pipeline uses (2, 3, 5) from
-`getnhood(strel('disk',r))` (default N=4 decomposition). Other radii fall back
-to a Euclidean disk. If you change `innerBuffer`/`ringWidth`, add the
-corresponding MATLAB neighborhood.
+### strel('disk', r) shape (gotcha #10, corrected 2026-08)
+`matlab_compat.strel_disk` hard-codes `getnhood(strel('disk', r))` output
+verified against MATLAB R2025b for r = 2, 3, 5: r=2 is the 13-px Euclidean
+diamond (MATLAB skips decomposition below r=3), r=3 is the 5x5 solid square,
+r=5 is a 9x9 69-px mask. Note MATLAB's decomposed disks for r>=3 are SMALLER
+than Euclidean disks (axial half-extent r-1), so `strel_disk` now RAISES for
+unverified r>=3 instead of silently substituting a Euclidean disk. If you
+change `innerBuffer`/`ringWidth`, print the MATLAB neighborhood and add it.
+
+## Known parity caveats (data flow — read before end-to-end comparison)
+
+1. **maxDvStack input scaling.** MATLAB builds the maxDvStack planes (line 669)
+   from the in-memory **pre-rescale float** NoRMCorre output, BEFORE the
+   per-trial `uint16((x-min)/(max-min)*65535)` rescale that produces the saved
+   `_mc.tif`. Feeding `pipeline.build_maxdv_stack` the saved `_mc.tif` applies
+   a different affine per trial, so `meanFluorMaxDvStack` (and the ROI stage
+   downstream) will NOT match MATLAB. For parity, feed it the unscaled float
+   MC stacks (export them from MATLAB, or save an unscaled companion).
+2. **Trial ordering / file discovery.** MATLAB (lines 39-46) pairs ephys trial
+   `tt` with the tt-th `.tif` in **alphabetical `dir` order** (skipping
+   dotfiles). `live/watcher.py` sorts by the parsed trial number instead. The
+   two agree only when trial numbers in filenames are zero-padded. With
+   unpadded names (`_1, _2, ..., _10`) MATLAB's order is 1,10,11,...,2,20,...
+   — reproduce THAT order (or zero-pad filenames) when comparing.
+3. **Bad-row mask fallback.** With `laserArtifactMcSecondSweepForDff = true`,
+   MATLAB loads `<raw>_mc_badRows.mat` and, if absent, COMPUTES the mask
+   in-line (lines 998-1013); on a size mismatch it warns and proceeds with no
+   exclusion. `run_dff` only calls the `bad_row_mask_loader` callback: with
+   `use_bad_rows=True` and no loader it silently excludes nothing, and a
+   size-mismatched mask raises. Wire `artifact.bad_row_mask_stack` into your
+   loader to reproduce the compute fallback (compute it on the FLOAT MC stack
+   like MATLAB line 622, not the rescaled TIFF, if using 'fixed' thresholds).
+4. **Trial excluder wiring.** `trial_excluder.run_trial_excluder` is a faithful
+   port but no in-repo caller invokes it; `runner.snapshot_to_matlab` writes
+   only the 11 pre-exclusion fields and none of the 8 `std*`/`excl*` fields
+   MATLAB saves per cell. Callers must run step 7 themselves and rename
+   `"std"`/`"std_filt"` to the MATLAB field names when writing a `.mat`.
+
+## MATLAB-semantics fixes applied 2026-08 (verified against R2025b)
+
+`strel_disk` masks (see gotcha #10 above), `fibermetric` (exact, see gotcha
+#7), `matlab_filtfilt` padlen 12 vs scipy default 15 (0.3 absolute edge error
+before the fix), `matlab_round` (half-away-from-zero; Python `round` is
+half-to-even — routed into the F0/window-length call sites in `dff.py` and
+`ephys.py`), `colon_count` ulp-snap (`1:0.29*10000` has 2900 elements, not
+2899), `std_n1`/`std_n1_omitnan`/excluder std returning 0 (not NaN) for a
+single (finite) observation, NaN-aware max/min index in the excluder late-peak
+test and the commonF0 window search, and MATLAB-style rounding in the uint16
+TIFF write and the laser-artifact integer fill value.
 
 ## Parity checking
 
@@ -137,6 +210,7 @@ The pure-numeric layer is directly checkable. Recommended approach:
    with ROI pixel sets **loaded from MATLAB** (`fineRoiXAllCells`) rather than
    recomputed — this separates dF/F arithmetic parity from ridge-filter parity.
 
-Non-bit-identical by construction: NoRMCorre (external), fibermetric ridge
-geometry, and any RNG (none here since `pickPercentage=1.0` selects all eligible
-trials deterministically — gotcha #14).
+Non-bit-identical by construction: NoRMCorre (external) and any RNG (none here
+since `pickPercentage=1.0` selects all eligible trials deterministically —
+gotcha #14). fibermetric is now exact (see above); float roundoff at the
+~1e-12 level remains in butter/filtfilt coefficients.

@@ -267,7 +267,9 @@ def run_live(ctx: context_mod.SessionContext, cfg: LiveConfig,
     return LiveRunner(ctx, cfg, on_trial=on_trial).run()
 
 
-def _load_rois(roi_path: str, roi_format: Optional[str]):
+def _load_rois(roi_path: str, roi_format: Optional[str],
+               output_dir: Optional[str] = None,
+               cellpose_cfg_path: Optional[str] = None):
     fmt = roi_format
     if fmt is None:
         ext = os.path.splitext(roi_path)[1].lower()
@@ -276,6 +278,28 @@ def _load_rois(roi_path: str, roi_format: Optional[str]):
         return context_mod.load_rois_from_voltmapping_mat(roi_path)
     if fmt in ("pkl", "pickle"):
         return context_mod.load_rois_from_pickle(roi_path)
+    if fmt == "cellpose":
+        # --rois = mean image (.tif/.npy, e.g. exported meanFluorMaxDvStack).
+        # Rough ROIs come from Cellpose; the global neuropil rings are then
+        # bootstrapped from the same mean image via the standard global pass
+        # (a 1-slice maxDvStack reproduces MATLAB's roiMeanMaxDvStack exactly,
+        # since mean-over-trials of the mean image is itself).
+        from .. import auto_roi as auto_roi_mod
+
+        cfg = None
+        if cellpose_cfg_path:
+            import json as _json
+            with open(cellpose_cfg_path) as fh:
+                cfg = _json.load(fh)
+        out_dir = os.path.join(output_dir or ".", "AutoROI")
+        mean_img = auto_roi_mod.load_mean_image(roi_path)
+        rough_rois, _report = auto_roi_mod.detect_rough_rois_cellpose(
+            mean_img, cfg, out_dir
+        )
+        _, bkgrnd_global = context_mod.build_rois_from_reference(
+            mean_img, mean_img[:, :, None], rough_rois
+        )
+        return rough_rois, bkgrnd_global
     raise ValueError(f"unknown roi_format {fmt!r}")
 
 
@@ -286,9 +310,17 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--expstruct", required=True,
                    help="Path to the ephys ExpStruct .mat (stim params).")
     p.add_argument("--rois", required=True,
-                   help="ROI source: a prior voltMapping .mat or a rois .pkl.")
-    p.add_argument("--roi-format", choices=["mat", "pickle"], default=None,
-                   help="Override ROI source format (else inferred from ext).")
+                   help="ROI source: a prior voltMapping .mat, a rois .pkl, or "
+                        "(with --roi-format cellpose) a mean-image .tif/.npy "
+                        "to segment automatically.")
+    p.add_argument("--roi-format", choices=["mat", "pickle", "cellpose"],
+                   default=None,
+                   help="Override ROI source format (else inferred from ext). "
+                        "'cellpose' detects rough ROIs on the given mean image "
+                        "via the shared Cellpose wrapper (see auto_roi.py).")
+    p.add_argument("--cellpose-cfg", default=None,
+                   help="Optional JSON file overriding auto_roi.DEFAULT_CFG "
+                        "keys (diameter, min_area_px, dilate_radius_px, ...).")
     p.add_argument("--watch", required=True, dest="watch_folder",
                    help="Folder to watch for *_mc.tif trial files.")
     p.add_argument("--out", required=True, dest="output_dir",
@@ -315,7 +347,10 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     args = build_argparser().parse_args(argv)
-    rough_rois, bkgrnd_global = _load_rois(args.rois, args.roi_format)
+    rough_rois, bkgrnd_global = _load_rois(
+        args.rois, args.roi_format,
+        output_dir=args.output_dir, cellpose_cfg_path=args.cellpose_cfg,
+    )
     ctx = context_mod.SessionContext.from_expstruct(
         args.expstruct, rough_rois, bkgrnd_global, args.up_or_down,
         common_f0=args.common_f0, roi_source=args.rois,
